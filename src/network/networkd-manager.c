@@ -453,7 +453,8 @@ int manager_rtnl_process_route(sd_netlink *rtnl, sd_netlink_message *message, vo
 
                 log_link_debug(link,
                                "%s route: dst: %s%s, src: %s, gw: %s, prefsrc: %s, scope: %s, table: %s, proto: %s, type: %s",
-                               type == RTM_DELROUTE ? "Forgetting" : route ? "Updating remembered" : "Remembering",
+                               (!route && !link->manager->manage_foreign_routes) || type == RTM_DELROUTE ? "Forgetting" :
+                               route ? "Updating remembered" : "Remembering",
                                strna(buf_dst), strempty(buf_dst_prefixlen),
                                strna(buf_src), strna(buf_gw), strna(buf_prefsrc),
                                format_route_scope(scope, buf_scope, sizeof buf_scope),
@@ -464,7 +465,7 @@ int manager_rtnl_process_route(sd_netlink *rtnl, sd_netlink_message *message, vo
 
         switch (type) {
         case RTM_NEWROUTE:
-                if (!route) {
+                if (!route && link->manager->manage_foreign_routes) {
                         /* A route appeared that we did not request */
                         r = route_add_foreign(link, family, &dst, dst_prefixlen, &gw, tos, priority, table, &route);
                         if (r < 0) {
@@ -1518,6 +1519,7 @@ int manager_new(Manager **ret) {
 
         *m = (Manager) {
                 .speed_meter_interval_usec = SPEED_METER_DEFAULT_TIME_INTERVAL,
+                .manage_foreign_routes = true,
         };
 
         m->state_file = strdup("/run/systemd/netif/state");
